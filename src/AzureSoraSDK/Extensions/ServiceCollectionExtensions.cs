@@ -94,14 +94,7 @@ namespace AzureSoraSDK.Extensions
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                     onRetry: (outcome, timespan, retryCount, context) =>
                     {
-                        if (context.Values.TryGetValue("logger", out var loggerValue) && 
-                            loggerValue is Microsoft.Extensions.Logging.ILogger logger)
-                        {
-                            logger.LogWarning(
-                                "Retry {RetryCount} after {Delay}ms", 
-                                retryCount, 
-                                timespan.TotalMilliseconds);
-                        }
+                        // Logging is handled by the individual client classes
                     });
         }
 
