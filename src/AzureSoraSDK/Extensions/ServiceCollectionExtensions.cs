@@ -1,4 +1,5 @@
 using System;
+using System.Net.Http;
 using AzureSoraSDK.Configuration;
 using AzureSoraSDK.Interfaces;
 using Microsoft.Extensions.Configuration;
