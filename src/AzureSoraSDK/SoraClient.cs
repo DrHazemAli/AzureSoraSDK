@@ -68,7 +68,7 @@ namespace AzureSoraSDK
                 .OrResult(msg => msg.StatusCode == HttpStatusCode.TooManyRequests)
                 .WaitAndRetryAsync(
                     _options.MaxRetryAttempts,
-                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)) * _options.RetryDelay,
+                    retryAttempt => TimeSpan.FromMilliseconds(_options.RetryDelay.TotalMilliseconds * Math.Pow(2, retryAttempt)),
                     onRetry: (outcome, timespan, retryCount, context) =>
                     {
                         var statusCode = outcome.Result?.StatusCode;

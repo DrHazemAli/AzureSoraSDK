@@ -72,7 +72,7 @@ namespace AzureSoraSDK.Exceptions
     public class SoraAuthenticationException : SoraException
     {
         public SoraAuthenticationException(string message) 
-            : base(message, HttpStatusCode.Unauthorized, "AUTH_FAILED") { }
+            : base(message, System.Net.HttpStatusCode.Unauthorized, "AUTH_FAILED") { }
 
         protected SoraAuthenticationException(SerializationInfo info, StreamingContext context) 
             : base(info, context) { }
@@ -87,7 +87,7 @@ namespace AzureSoraSDK.Exceptions
         public string? ResourceId { get; set; }
 
         public SoraNotFoundException(string message, string? resourceId = null) 
-            : base(message, HttpStatusCode.NotFound, "NOT_FOUND")
+            : base(message, System.Net.HttpStatusCode.NotFound, "NOT_FOUND")
         {
             ResourceId = resourceId;
         }
@@ -116,7 +116,7 @@ namespace AzureSoraSDK.Exceptions
         public DateTimeOffset? ResetTime { get; set; }
 
         public SoraRateLimitException(string message, TimeSpan? retryAfter = null) 
-            : base(message, HttpStatusCode.TooManyRequests, "RATE_LIMIT_EXCEEDED")
+            : base(message, System.Net.HttpStatusCode.TooManyRequests, "RATE_LIMIT_EXCEEDED")
         {
             RetryAfter = retryAfter;
         }
@@ -176,7 +176,7 @@ namespace AzureSoraSDK.Exceptions
         public Dictionary<string, string[]>? ValidationErrors { get; set; }
 
         public SoraValidationException(string message, Dictionary<string, string[]>? errors = null) 
-            : base(message, HttpStatusCode.BadRequest, "VALIDATION_FAILED")
+            : base(message, System.Net.HttpStatusCode.BadRequest, "VALIDATION_FAILED")
         {
             ValidationErrors = errors;
         }
