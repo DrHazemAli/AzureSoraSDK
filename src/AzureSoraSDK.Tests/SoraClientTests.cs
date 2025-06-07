@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -79,7 +80,8 @@ namespace AzureSoraSDK.Tests
 
             // Act & Assert
             var act = () => new SoraClient(_httpClient, invalidOptions);
-            act.Should().Throw<ArgumentException>();
+            act.Should().Throw<ValidationException>()
+                .WithMessage("*Endpoint field is required*");
         }
 
         [Fact]
