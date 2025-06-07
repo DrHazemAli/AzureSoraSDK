@@ -63,7 +63,7 @@ namespace AzureSoraSDK.Tests
         public void Constructor_WithNullOptions_ThrowsArgumentNullException()
         {
             // Act & Assert
-            var act = () => new PromptEnhancer(_httpClient, null!);
+            var act = () => new PromptEnhancer(_httpClient, (SoraClientOptions)null!);
             act.Should().Throw<ArgumentNullException>().WithParameterName("options");
         }
 

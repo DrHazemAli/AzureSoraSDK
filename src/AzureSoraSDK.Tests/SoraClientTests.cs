@@ -229,7 +229,7 @@ namespace AzureSoraSDK.Tests
                 .Respond(() =>
                 {
                     callCount++;
-                    return callCount <= 2
+                    return Task.FromResult(callCount <= 2
                         ? new HttpResponseMessage(HttpStatusCode.OK)
                         {
                             Content = new StringContent(
@@ -243,7 +243,7 @@ namespace AzureSoraSDK.Tests
                                 JsonSerializer.Serialize(successResponse, _jsonOptions),
                                 Encoding.UTF8,
                                 "application/json")
-                        };
+                        });
                 });
 
             // Act
@@ -323,7 +323,13 @@ namespace AzureSoraSDK.Tests
             var tempFile = System.IO.Path.GetTempFileName();
 
             _mockHttp.When(HttpMethod.Get, videoUri.ToString())
-                .Respond("video/mp4", new ByteArrayContent(videoContent));
+                .Respond(req => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent(videoContent)
+                    {
+                        Headers = { ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("video/mp4") }
+                    }
+                }));
 
             try
             {
@@ -379,7 +385,7 @@ namespace AzureSoraSDK.Tests
         }
 
         [Fact]
-        public async Task LegacyConstructor_CreatesValidClient()
+        public void LegacyConstructor_CreatesValidClient()
         {
             // Arrange & Act
             using var client = new SoraClient(

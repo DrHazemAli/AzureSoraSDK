@@ -403,7 +403,7 @@ namespace AzureSoraSDK
             HttpResponseMessage response, 
             CancellationToken cancellationToken)
         {
-            var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            var stream = await response.Content.ReadAsStreamAsync();
             return await JsonSerializer.DeserializeAsync<T>(stream, _jsonOptions, cancellationToken);
         }
 

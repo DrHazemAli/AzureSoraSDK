@@ -170,7 +170,7 @@ Enhanced prompts:";
                 }
 
                 var completionResponse = await JsonSerializer.DeserializeAsync<CompletionResponse>(
-                    await response.Content.ReadAsStreamAsync(cancellationToken),
+                    await response.Content.ReadAsStreamAsync(),
                     _jsonOptions,
                     cancellationToken);
 

@@ -9,11 +9,20 @@
     <Authors>Hazem Ali</Authors>
     <Company>Microsoft Community</Company>
     <Description>Community .NET SDK for Azure OpenAI Sora video generation with enhanced prompt suggestions and job management.</Description>
-    <PackageTags>azure;openai;video;ai;sora;azure-sora</PackageTags>
+    <PackageTags>azure;openai;video;ai;sora;azure-sora;video-generation;prompt-enhancement</PackageTags>
     <RepositoryUrl>https://github.com/DrHazemAli/AzureSoraSDK</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/DrHazemAli/AzureSoraSDK</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>sora_sdk.jpg</PackageIcon>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\sora_sdk.jpg" Pack="true" PackagePath="\" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.0" />

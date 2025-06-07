@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using AzureSoraSDK;
 using AzureSoraSDK.Configuration;
 using AzureSoraSDK.Exceptions;
+using AzureSoraSDK.Extensions;
 using AzureSoraSDK.Interfaces;
 using AzureSoraSDK.Models;
 using Microsoft.Extensions.DependencyInjection;
