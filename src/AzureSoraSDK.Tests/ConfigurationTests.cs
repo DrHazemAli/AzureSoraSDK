@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using AzureSoraSDK.Configuration;
 using FluentAssertions;
 using Xunit;
@@ -35,7 +36,7 @@ namespace AzureSoraSDK.Tests
             options.Endpoint.Should().BeEmpty();
             options.ApiKey.Should().BeEmpty();
             options.DeploymentName.Should().BeEmpty();
-            options.ApiVersion.Should().Be("preview");
+            options.ApiVersion.Should().Be("2024-02-15-preview");
             options.HttpTimeout.Should().Be(TimeSpan.FromMinutes(2));
             options.MaxRetryAttempts.Should().Be(3);
             options.RetryDelay.Should().Be(TimeSpan.FromSeconds(1));
@@ -105,7 +106,7 @@ namespace AzureSoraSDK.Tests
 
             // Act & Assert
             var act = () => options.Validate();
-            act.Should().Throw<ArgumentException>()
+            act.Should().Throw<ValidationException>()
                 .WithMessage("*Endpoint*");
         }
 
@@ -170,7 +171,7 @@ namespace AzureSoraSDK.Tests
 
             // Act & Assert
             var act = () => options.Validate();
-            act.Should().Throw<ArgumentException>()
+            act.Should().Throw<ValidationException>()
                 .WithMessage("*ApiKey*");
         }
 
@@ -203,7 +204,7 @@ namespace AzureSoraSDK.Tests
 
             // Act & Assert
             var act = () => options.Validate();
-            act.Should().Throw<ArgumentException>()
+            act.Should().Throw<ValidationException>()
                 .WithMessage("*DeploymentName*");
         }
 

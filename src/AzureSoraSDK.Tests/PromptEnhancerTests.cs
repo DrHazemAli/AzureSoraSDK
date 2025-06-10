@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -80,7 +81,7 @@ namespace AzureSoraSDK.Tests
 
             // Act & Assert
             var act = () => new PromptEnhancer(_httpClient, invalidOptions);
-            act.Should().Throw<ArgumentException>();
+            act.Should().Throw<ValidationException>();
         }
 
         [Fact]
@@ -206,7 +207,7 @@ namespace AzureSoraSDK.Tests
 
             // Assert
             capturedRequestBody.Should().Contain("\"temperature\":0.5");
-            capturedRequestBody.Should().Contain("\"topP\":0.8");
+            capturedRequestBody.Should().Contain("\"top_p\":0.8");
         }
 
         [Fact]
@@ -422,7 +423,7 @@ A spring forest with blooming wildflowers
 
             // Act & Assert
             var act = () => options.Validate();
-            act.Should().Throw<ArgumentException>();
+            act.Should().Throw<ValidationException>();
         }
 
         [Fact]

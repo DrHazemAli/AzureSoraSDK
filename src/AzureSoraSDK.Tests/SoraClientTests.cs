@@ -512,7 +512,11 @@ namespace AzureSoraSDK.Tests
         {
             // Arrange
             const string expectedJobId = "job-123";
-            var responseContent = new { id = expectedJobId, status = "queued" };
+            var responseContent = new { 
+                id = expectedJobId, 
+                status = "queued",
+                @object = "video.generation.job"
+            };
             
             _mockHttp.When(HttpMethod.Post, "*/v1/video/generations/jobs*")
                 .WithContent("*\"width\":1920*")
