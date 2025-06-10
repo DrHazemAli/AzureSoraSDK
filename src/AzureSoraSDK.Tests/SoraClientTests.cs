@@ -91,7 +91,7 @@ namespace AzureSoraSDK.Tests
             const string expectedJobId = "job-123";
             var responseContent = new { jobId = expectedJobId };
             
-            _mockHttp.When(HttpMethod.Post, "*/video/jobs*")
+            _mockHttp.When(HttpMethod.Post, "*/v1/video/generations/jobs*")
                 .Respond("application/json", JsonSerializer.Serialize(responseContent, _jsonOptions));
 
             // Act
@@ -135,7 +135,7 @@ namespace AzureSoraSDK.Tests
         public async Task SubmitVideoJobAsync_WithUnauthorizedResponse_ThrowsAuthenticationException()
         {
             // Arrange
-            _mockHttp.When(HttpMethod.Post, "*/video/jobs*")
+            _mockHttp.When(HttpMethod.Post, "*/v1/video/generations/jobs*")
                 .Respond(HttpStatusCode.Unauthorized, "application/json", 
                     "{\"error\": {\"message\": \"Invalid API key\"}}");
 
@@ -154,7 +154,7 @@ namespace AzureSoraSDK.Tests
         public async Task SubmitVideoJobAsync_WithRateLimitExceeded_ThrowsRateLimitException()
         {
             // Arrange
-            _mockHttp.When(HttpMethod.Post, "*/video/jobs*")
+            _mockHttp.When(HttpMethod.Post, "*/v1/video/generations/jobs*")
                 .Respond(HttpStatusCode.TooManyRequests, "application/json", 
                     "{\"error\": {\"message\": \"Rate limit exceeded\"}}");
 
@@ -181,7 +181,7 @@ namespace AzureSoraSDK.Tests
                 createdAt = DateTimeOffset.UtcNow
             };
 
-            _mockHttp.When(HttpMethod.Get, $"*/video/jobs/{jobId}*")
+            _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
                 .Respond("application/json", JsonSerializer.Serialize(responseContent, _jsonOptions));
 
             // Act
@@ -208,7 +208,7 @@ namespace AzureSoraSDK.Tests
         {
             // Arrange
             const string jobId = "job-notfound";
-            _mockHttp.When(HttpMethod.Get, $"*/video/jobs/{jobId}*")
+            _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
                 .Respond(HttpStatusCode.NotFound);
 
             // Act & Assert
@@ -227,7 +227,7 @@ namespace AzureSoraSDK.Tests
             var successResponse = new { status = "succeeded", videoUrl };
 
             var callCount = 0;
-            _mockHttp.When(HttpMethod.Get, $"*/video/jobs/{jobId}*")
+            _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
                 .Respond(() =>
                 {
                     callCount++;
@@ -267,7 +267,7 @@ namespace AzureSoraSDK.Tests
                 error = new { message = "Video generation failed", code = "VID_FAIL" }
             };
 
-            _mockHttp.When(HttpMethod.Get, $"*/video/jobs/{jobId}*")
+            _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
                 .Respond("application/json", JsonSerializer.Serialize(failedResponse, _jsonOptions));
 
             // Act & Assert
@@ -283,7 +283,7 @@ namespace AzureSoraSDK.Tests
             const string jobId = "job-123";
             var runningResponse = new { status = "running" };
 
-            _mockHttp.When(HttpMethod.Get, $"*/video/jobs/{jobId}*")
+            _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
                 .Respond("application/json", JsonSerializer.Serialize(runningResponse, _jsonOptions));
 
             // Act & Assert
@@ -303,7 +303,7 @@ namespace AzureSoraSDK.Tests
             var runningResponse = new { status = "running" };
             var cts = new CancellationTokenSource();
 
-            _mockHttp.When(HttpMethod.Get, $"*/video/jobs/{jobId}*")
+            _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
                 .Respond("application/json", JsonSerializer.Serialize(runningResponse, _jsonOptions));
 
             // Act & Assert

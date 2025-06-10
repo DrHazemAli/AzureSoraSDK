@@ -139,7 +139,7 @@ namespace AzureSoraSDK
                 seed = request.Seed
             };
 
-            var url = $"/openai/deployments/{_options.DeploymentName}/video/jobs?api-version={_options.ApiVersion}";
+            var url = $"/openai/v1/video/generations/jobs?api-version={_options.ApiVersion}";
             
             _logger.LogInformation(
                 "Submitting video job: {Width}x{Height}, {Duration}s, prompt length: {PromptLength}",
@@ -174,7 +174,7 @@ namespace AzureSoraSDK
             if (string.IsNullOrWhiteSpace(jobId))
                 throw new ArgumentException("Job ID is required", nameof(jobId));
 
-            var url = $"/openai/deployments/{_options.DeploymentName}/video/jobs/{jobId}?api-version={_options.ApiVersion}";
+            var url = $"/openai/v1/video/generations/jobs/{jobId}?api-version={_options.ApiVersion}";
             
             _logger.LogDebug("Checking status for job: {JobId}", jobId);
 

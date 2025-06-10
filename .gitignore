@@ -420,4 +420,7 @@ FodyWeavers.xsd
 .AppleDesktop
 Network Trash Folder
 Temporary Items
-.apdisk 
+.apdisk
+
+# NuGet config with credentials
+NuGet.config.user 

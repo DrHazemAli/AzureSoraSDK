@@ -7,6 +7,8 @@
 
 ![Sora SDK](https://github.com/DrHazemAli/AzureSoraSDK/blob/main/sora_sdk.jpg)
 
+📚 **[Documentation Wiki](https://github.com/DrHazemAli/AzureSoraSDK/wiki)** | 📋 **[Changelog](CHANGELOG.md)** | 📦 **[NuGet Package](https://www.nuget.org/packages/AzureSoraSDK)**
+
 This is a community-driven SDK for Azure OpenAI Sora video generation and prompt enhancement. The SDK provides a comprehensive .NET solution for generating high-quality videos using Azure OpenAI's Sora model, with built-in prompt enhancement capabilities to help you create more compelling video content.
 
 ## Features
@@ -373,15 +375,4 @@ MIT © Hazem Ali
 
 ## Changelog
 
-### v1.0.0
-- Initial release
-- Added dependency injection support
-- Implemented retry policies and circuit breaker
-- Added comprehensive error handling with specific exception types
-- Added logging support
-- Improved HttpClient management
-- Added nullable reference type support
-- Added extensive unit tests
-- Added configuration validation
-- Added progress tracking and metadata support
-- Improved prompt enhancement with chat completions API
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes in each release.
