@@ -16,7 +16,7 @@ Welcome to the AzureSoraSDK wiki! This SDK provides a comprehensive .NET solutio
 ## 🚀 Key Features
 
 - **Video Generation**: Submit jobs, poll status, wait for completion, download MP4
-- **Customizable**: Width, height, duration, aspect ratio, frame rate, seed, quality settings
+- **Customizable**: Width, height, and duration settings
 - **Job Management**: Check job status with detailed progress tracking
 - **Enhanced Prompts**: Get real-time AI-powered prompt improvement suggestions
 - **Enterprise Ready**: Full dependency injection, logging, retry logic, and error handling

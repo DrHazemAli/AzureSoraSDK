@@ -17,66 +17,67 @@ namespace BasicExample
     {
         static async Task Main(string[] args)
         {
-            // Example 1: Basic usage with legacy constructor
-            await BasicUsageExample();
+            // Configure the client
+            var options = new SoraClientOptions
+            {
+                Endpoint = "https://your-resource.openai.azure.com",
+                ApiKey = "your-api-key",
+                DeploymentName = "sora",
+                ApiVersion = "preview"
+            };
 
-            // Example 2: Dependency Injection usage
-            await DependencyInjectionExample();
-        }
-
-        static async Task BasicUsageExample()
-        {
-            Console.WriteLine("=== Basic Usage Example ===\n");
-
-            // Get configuration from environment variables
-            var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT") 
-                ?? "https://your-resource.openai.azure.com";
-            var apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_KEY") 
-                ?? "your-api-key";
-            var deploymentName = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT") 
-                ?? "sora";
+            // Create client
+            using var client = new SoraClient(options.Endpoint, options.ApiKey, options.DeploymentName);
 
             try
             {
-                using var client = new SoraClient(endpoint, apiKey, deploymentName);
-
-                // Submit a video generation job
-                Console.WriteLine("Submitting video generation job...");
-                var jobId = await client.SubmitVideoJobAsync(
-                    prompt: "A peaceful sunrise over mountain peaks with birds flying, cinematic quality, 10 seconds",
+                // Example 1: Submit video generation job with explicit dimensions
+                Console.WriteLine("Generating video with explicit dimensions...");
+                var jobId1 = await client.SubmitVideoJobAsync(
+                    prompt: "A serene waterfall in a lush forest with sunlight filtering through trees",
                     width: 1280,
                     height: 720,
-                    durationInSeconds: 10,
+                    nSeconds: 10);
+
+                Console.WriteLine($"Job submitted: {jobId1}");
+
+                // Example 2: Submit video generation job with aspect ratio (v1.0.2+)
+                Console.WriteLine("\nGenerating video with aspect ratio...");
+                var jobId2 = await client.SubmitVideoJobAsync(
+                    prompt: "A futuristic city at night with flying cars and neon lights",
                     aspectRatio: "16:9",
-                    frameRate: 30
-                );
+                    quality: "high",
+                    nSeconds: 15);
 
-                Console.WriteLine($"Job submitted with ID: {jobId}");
+                Console.WriteLine($"Job submitted: {jobId2}");
 
-                // Wait for completion
-                Console.WriteLine("Waiting for video generation to complete...");
-                var videoUri = await client.WaitForCompletionAsync(jobId, pollIntervalSeconds: 5);
-                
-                Console.WriteLine($"Video generated successfully!");
-                Console.WriteLine($"Video URL: {videoUri}");
+                // Wait for completion of first job
+                Console.WriteLine($"\nWaiting for job {jobId1} to complete...");
+                var videoUri = await client.WaitForCompletionAsync(jobId1);
+                Console.WriteLine($"Video ready: {videoUri}");
 
-                // Download the video
-                var outputPath = "sunrise_mountains.mp4";
-                Console.WriteLine($"Downloading video to {outputPath}...");
+                // Download video
+                var outputPath = "waterfall.mp4";
                 await client.DownloadVideoAsync(videoUri, outputPath);
-                
                 Console.WriteLine($"Video downloaded to: {outputPath}");
+
+                // Check status of second job
+                var status = await client.GetJobStatusAsync(jobId2);
+                Console.WriteLine($"\nJob {jobId2} status: {status.Status}");
+
+                // Example 3: Calculate custom dimensions
+                Console.WriteLine("\nDimension calculation examples:");
+                
+                var (width, height) = SoraClient.GetCommonDimensions("1:1", "medium");
+                Console.WriteLine($"Square video (medium): {width}x{height}");
+                
+                var (w2, h2) = SoraClient.CalculateDimensionsFromAspectRatio("2.35:1", 1920);
+                Console.WriteLine($"Cinema format: {w2}x{h2}");
             }
-            catch (SoraException ex)
+            catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
-                if (ex.ErrorCode != null)
-                {
-                    Console.WriteLine($"Error Code: {ex.ErrorCode}");
-                }
             }
-
-            Console.WriteLine();
         }
 
         static async Task DependencyInjectionExample()
@@ -155,16 +156,13 @@ namespace BasicExample
                 var enhancedPrompt = suggestions.Length > 0 ? suggestions[0] : originalPrompt;
                 _logger.LogInformation("Using prompt: {Prompt}", enhancedPrompt);
 
-                // Submit video job with detailed configuration
+                // Submit video job with validated request
                 var request = new VideoGenerationRequest
                 {
                     Prompt = enhancedPrompt,
                     Width = 1920,
                     Height = 1080,
-                    DurationInSeconds = 15,
-                    AspectRatio = "16:9",
-                    FrameRate = 30,
-                    Quality = "high",
+                    NSeconds = 15,
                     Metadata = new Dictionary<string, string>
                     {
                         ["source"] = "example-app",
@@ -180,9 +178,7 @@ namespace BasicExample
                     request.Prompt,
                     request.Width,
                     request.Height,
-                    request.DurationInSeconds,
-                    request.AspectRatio,
-                    request.FrameRate
+                    request.NSeconds
                 );
 
                 _logger.LogInformation("Job submitted: {JobId}", jobId);

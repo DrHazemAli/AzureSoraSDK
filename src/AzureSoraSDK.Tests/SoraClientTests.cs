@@ -35,9 +35,9 @@ namespace AzureSoraSDK.Tests
             _options = new SoraClientOptions
             {
                 Endpoint = "https://test.openai.azure.com",
-                ApiKey = "test-api-key",
-                DeploymentName = "test-deployment",
-                ApiVersion = "2024-10-21"
+                ApiKey = "test-key",
+                DeploymentName = "sora",
+                ApiVersion = "preview"
             };
             _mockLogger = new Mock<ILogger<SoraClient>>();
             _sut = new SoraClient(_httpClient, _options, _mockLogger.Object);
@@ -89,7 +89,7 @@ namespace AzureSoraSDK.Tests
         {
             // Arrange
             const string expectedJobId = "job-123";
-            var responseContent = new { jobId = expectedJobId };
+            var responseContent = new { id = expectedJobId, status = "queued", @object = "video.generation.job" };
             
             _mockHttp.When(HttpMethod.Post, "*/v1/video/generations/jobs*")
                 .Respond("application/json", JsonSerializer.Serialize(responseContent, _jsonOptions));
@@ -99,7 +99,7 @@ namespace AzureSoraSDK.Tests
                 prompt: "A beautiful sunset",
                 width: 1280,
                 height: 720,
-                durationInSeconds: 10);
+                nSeconds: 10);
 
             // Assert
             result.Should().Be(expectedJobId);
@@ -113,7 +113,7 @@ namespace AzureSoraSDK.Tests
                 prompt: "Test",
                 width: 127, // Invalid - not divisible by 8
                 height: 720,
-                durationInSeconds: 10);
+                nSeconds: 10);
 
             await act.Should().ThrowAsync<SoraValidationException>();
         }
@@ -126,7 +126,7 @@ namespace AzureSoraSDK.Tests
                 prompt: "",
                 width: 1280,
                 height: 720,
-                durationInSeconds: 10);
+                nSeconds: 10);
 
             await act.Should().ThrowAsync<SoraValidationException>();
         }
@@ -144,7 +144,7 @@ namespace AzureSoraSDK.Tests
                 prompt: "Test",
                 width: 1280,
                 height: 720,
-                durationInSeconds: 10);
+                nSeconds: 10);
 
             await act.Should().ThrowAsync<SoraAuthenticationException>()
                 .WithMessage("*Authentication failed*");
@@ -163,7 +163,7 @@ namespace AzureSoraSDK.Tests
                 prompt: "Test",
                 width: 1280,
                 height: 720,
-                durationInSeconds: 10);
+                nSeconds: 10);
 
             await act.Should().ThrowAsync<SoraRateLimitException>();
         }
@@ -175,10 +175,20 @@ namespace AzureSoraSDK.Tests
             const string jobId = "job-123";
             var responseContent = new
             {
+                id = jobId,
+                @object = "video.generation.job",
                 status = "running",
-                videoUrl = (string?)null,
-                progressPercentage = 50,
-                createdAt = DateTimeOffset.UtcNow
+                created_at = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                finished_at = (long?)null,
+                expires_at = (long?)null,
+                generations = new object[] { },
+                failure_reason = (string?)null,
+                model = "sora",
+                prompt = "A test prompt",
+                n_variants = 1,
+                n_seconds = 10,
+                width = 1280,
+                height = 720
             };
 
             _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
@@ -191,7 +201,7 @@ namespace AzureSoraSDK.Tests
             result.Should().NotBeNull();
             result.JobId.Should().Be(jobId);
             result.Status.Should().Be(JobStatus.Running);
-            result.ProgressPercentage.Should().Be(50);
+            result.VideoUrl.Should().BeNull();
         }
 
         [Fact]
@@ -222,9 +232,24 @@ namespace AzureSoraSDK.Tests
         {
             // Arrange
             const string jobId = "job-123";
-            const string videoUrl = "https://example.com/video.mp4";
-            var pendingResponse = new { status = "running" };
-            var successResponse = new { status = "succeeded", videoUrl };
+            const string generationId = "gen-456";
+            var pendingResponse = new 
+            { 
+                id = jobId,
+                status = "running",
+                generations = new object[] { }
+            };
+            var successResponse = new 
+            { 
+                id = jobId,
+                status = "succeeded",
+                generations = new[] 
+                { 
+                    new { id = generationId, url = (string?)null } 
+                },
+                created_at = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                finished_at = DateTimeOffset.UtcNow.AddMinutes(2).ToUnixTimeSeconds()
+            };
 
             var callCount = 0;
             _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
@@ -253,7 +278,7 @@ namespace AzureSoraSDK.Tests
 
             // Assert
             result.Should().NotBeNull();
-            result.ToString().Should().Be(videoUrl);
+            result.ToString().Should().Contain($"/openai/v1/video/generations/{generationId}/content/video");
         }
 
         [Fact]
@@ -263,8 +288,10 @@ namespace AzureSoraSDK.Tests
             const string jobId = "job-123";
             var failedResponse = new
             {
+                id = jobId,
                 status = "failed",
-                error = new { message = "Video generation failed", code = "VID_FAIL" }
+                failure_reason = "Video generation failed",
+                generations = new object[] { }
             };
 
             _mockHttp.When(HttpMethod.Get, $"*/v1/video/generations/jobs/{jobId}*")
@@ -414,6 +441,93 @@ namespace AzureSoraSDK.Tests
             // Assert - should not throw when disposing again
             var act = () => client.Dispose();
             act.Should().NotThrow();
+        }
+
+        [Theory]
+        [InlineData("16:9", 1920, true, 1920, 1080)]
+        [InlineData("16:9", 1080, false, 1920, 1080)]
+        [InlineData("4:3", 1600, true, 1600, 1200)]
+        [InlineData("1:1", 1080, true, 1080, 1080)]
+        [InlineData("9:16", 1080, true, 1080, 1920)]
+        [InlineData("21:9", 2048, true, 2048, 880)]
+        public void CalculateDimensionsFromAspectRatio_WithValidInput_ReturnsCorrectDimensions(
+            string aspectRatio, int targetSize, bool preferWidth, int expectedWidth, int expectedHeight)
+        {
+            // Act
+            var (width, height) = SoraClient.CalculateDimensionsFromAspectRatio(aspectRatio, targetSize, preferWidth);
+
+            // Assert
+            width.Should().Be(expectedWidth);
+            height.Should().Be(expectedHeight);
+            (width % 8).Should().Be(0, "width should be divisible by 8");
+            (height % 8).Should().Be(0, "height should be divisible by 8");
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData(null)]
+        public void CalculateDimensionsFromAspectRatio_WithEmptyAspectRatio_ThrowsArgumentException(string aspectRatio)
+        {
+            // Act & Assert
+            var act = () => SoraClient.CalculateDimensionsFromAspectRatio(aspectRatio);
+            act.Should().Throw<ArgumentException>()
+                .WithParameterName("aspectRatio");
+        }
+
+        [Theory]
+        [InlineData("16-9")]
+        [InlineData("16:9:4")]
+        [InlineData("16")]
+        [InlineData("invalid")]
+        public void CalculateDimensionsFromAspectRatio_WithInvalidFormat_ThrowsArgumentException(string aspectRatio)
+        {
+            // Act & Assert
+            var act = () => SoraClient.CalculateDimensionsFromAspectRatio(aspectRatio);
+            act.Should().Throw<ArgumentException>()
+                .WithMessage("*Invalid aspect ratio format*");
+        }
+
+        [Theory]
+        [InlineData("16:9", "low", 640, 360)]
+        [InlineData("16:9", "medium", 1280, 720)]
+        [InlineData("16:9", "high", 1920, 1080)]
+        [InlineData("16:9", "ultra", 2048, 1152)]
+        [InlineData("4:3", "high", 1600, 1200)]
+        [InlineData("1:1", "high", 1080, 1080)]
+        [InlineData("9:16", "high", 1080, 1920)]
+        public void GetCommonDimensions_WithKnownAspectRatios_ReturnsCorrectDimensions(
+            string aspectRatio, string quality, int expectedWidth, int expectedHeight)
+        {
+            // Act
+            var (width, height) = SoraClient.GetCommonDimensions(aspectRatio, quality);
+
+            // Assert
+            width.Should().Be(expectedWidth);
+            height.Should().Be(expectedHeight);
+        }
+
+        [Fact]
+        public async Task SubmitVideoJobAsync_WithAspectRatio_CalculatesCorrectDimensions()
+        {
+            // Arrange
+            const string expectedJobId = "job-123";
+            var responseContent = new { id = expectedJobId, status = "queued" };
+            
+            _mockHttp.When(HttpMethod.Post, "*/v1/video/generations/jobs*")
+                .WithContent("*\"width\":1920*")
+                .WithContent("*\"height\":1080*")
+                .Respond("application/json", JsonSerializer.Serialize(responseContent, _jsonOptions));
+
+            // Act
+            var result = await _sut.SubmitVideoJobAsync(
+                prompt: "A test video",
+                aspectRatio: "16:9",
+                quality: "high",
+                nSeconds: 10);
+
+            // Assert
+            result.Should().Be(expectedJobId);
         }
     }
 } 

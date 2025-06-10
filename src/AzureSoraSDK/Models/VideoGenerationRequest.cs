@@ -36,35 +36,7 @@ namespace AzureSoraSDK.Models
         /// </summary>
         [Required]
         [Range(1, 60)]
-        public int DurationInSeconds { get; set; }
-
-        /// <summary>
-        /// Aspect ratio (e.g., "16:9", "4:3", "1:1")
-        /// </summary>
-        [RegularExpression(@"^\d+:\d+$")]
-        public string? AspectRatio { get; set; }
-
-        /// <summary>
-        /// Frame rate (must be between 12 and 60)
-        /// </summary>
-        [Range(12, 60)]
-        public int? FrameRate { get; set; }
-
-        /// <summary>
-        /// Seed for reproducible generation
-        /// </summary>
-        [Range(0, int.MaxValue)]
-        public int? Seed { get; set; }
-
-        /// <summary>
-        /// Quality setting (standard, high, ultra)
-        /// </summary>
-        public string? Quality { get; set; }
-
-        /// <summary>
-        /// Style preset (realistic, animated, artistic, etc.)
-        /// </summary>
-        public string? Style { get; set; }
+        public int NSeconds { get; set; }
 
         /// <summary>
         /// Additional metadata to associate with the job
@@ -83,15 +55,6 @@ namespace AzureSoraSDK.Models
             if (Width % 8 != 0 || Height % 8 != 0)
             {
                 throw new ValidationException("Width and height must be divisible by 8");
-            }
-
-            if (!string.IsNullOrEmpty(Quality))
-            {
-                var validQualities = new[] { "standard", "high", "ultra" };
-                if (!validQualities.Contains(Quality.ToLowerInvariant()))
-                {
-                    throw new ValidationException($"Quality must be one of: {string.Join(", ", validQualities)}");
-                }
             }
         }
     }

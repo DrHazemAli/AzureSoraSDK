@@ -17,21 +17,15 @@ Task<string> SubmitVideoJobAsync(
     string prompt,
     int width,
     int height,
-    int durationInSeconds,
-    string? aspectRatio = null,
-    int? frameRate = null,
-    int? seed = null,
+    int nSeconds,
     CancellationToken cancellationToken = default)
 ```
 
 **Parameters:**
-- `prompt` (string, required): The text prompt describing the video to generate
-- `width` (int, required): Video width in pixels (must be divisible by 8)
-- `height` (int, required): Video height in pixels (must be divisible by 8)
-- `durationInSeconds` (int, required): Video duration (1-60 seconds)
-- `aspectRatio` (string, optional): Aspect ratio (e.g., "16:9", "4:3")
-- `frameRate` (int, optional): Frame rate (15-60 fps)
-- `seed` (int, optional): Seed for reproducible generation
+- `prompt` (string, required): The text description of the video to generate
+- `width` (int, required): Video width in pixels (128-2048)
+- `height` (int, required): Video height in pixels (128-2048)
+- `nSeconds` (int, required): Video duration (1-60 seconds)
 - `cancellationToken` (CancellationToken, optional): Cancellation token
 
 **Returns:** Task<string> - The job ID
@@ -40,6 +34,42 @@ Task<string> SubmitVideoJobAsync(
 - `SoraValidationException`: Invalid parameters
 - `SoraAuthenticationException`: Authentication failed
 - `SoraRateLimitException`: Rate limit exceeded
+
+#### SubmitVideoJobAsync (Aspect Ratio Overload)
+
+Submits a video generation job using aspect ratio and quality settings.
+
+```csharp
+Task<string> SubmitVideoJobAsync(
+    string prompt,
+    string aspectRatio,
+    string quality,
+    int nSeconds,
+    CancellationToken cancellationToken = default)
+```
+
+**Parameters:**
+- `prompt` (string, required): The text description of the video to generate
+- `aspectRatio` (string, required): Aspect ratio (e.g., "16:9", "4:3", "1:1", "9:16")
+- `quality` (string, required): Quality level: "low", "medium", "high", "ultra"
+- `nSeconds` (int, required): Video duration (1-60 seconds)
+- `cancellationToken` (CancellationToken, optional): Cancellation token
+
+**Returns:** Task<string> - The job ID
+
+**Supported Aspect Ratios:**
+- `16:9` - Widescreen (YouTube, TV)
+- `4:3` - Standard (older TVs)
+- `1:1` - Square (Instagram)
+- `9:16` - Vertical/Portrait (Instagram Stories, TikTok)
+- `3:4` - Portrait
+- `21:9` - Ultrawide (Cinema)
+
+**Quality Presets:**
+- `low` - Lower resolution for faster generation
+- `medium` - Balanced quality and speed
+- `high` - High quality (default)
+- `ultra` - Maximum quality
 
 #### GetJobStatusAsync
 
@@ -176,12 +206,7 @@ public class VideoGenerationRequest
     public string Prompt { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
-    public int DurationInSeconds { get; set; }
-    public string? AspectRatio { get; set; }
-    public int? FrameRate { get; set; }
-    public string? Style { get; set; }
-    public string? Quality { get; set; }
-    public int? Seed { get; set; }
+    public int NSeconds { get; set; }
     public Dictionary<string, string>? Metadata { get; set; }
 }
 ```
@@ -309,6 +334,75 @@ catch (SoraTimeoutException ex)
     Console.WriteLine($"Operation timed out after {ex.Timeout}");
 }
 ```
+
+## Utility Methods
+
+### CalculateDimensionsFromAspectRatio
+
+Calculates video dimensions from an aspect ratio string.
+
+```csharp
+public static (int width, int height) CalculateDimensionsFromAspectRatio(
+    string aspectRatio, 
+    int targetSize = 1920, 
+    bool preferWidth = true)
+```
+
+**Parameters:**
+- `aspectRatio` (string): Aspect ratio in format "width:height" (e.g., "16:9")
+- `targetSize` (int): Target size for the larger dimension (default: 1920)
+- `preferWidth` (bool): If true, targetSize applies to width; if false, applies to height
+
+**Returns:** Tuple of (width, height) rounded to nearest 8 pixels
+
+**Example:**
+```csharp
+// Calculate dimensions for 16:9 with width of 1920
+var (width, height) = SoraClient.CalculateDimensionsFromAspectRatio("16:9", 1920, true);
+// Returns: (1920, 1080)
+
+// Calculate dimensions for 4:3 with height of 720
+var (width, height) = SoraClient.CalculateDimensionsFromAspectRatio("4:3", 720, false);
+// Returns: (960, 720)
+```
+
+### GetCommonDimensions
+
+Gets common video dimensions for standard aspect ratios and quality levels.
+
+```csharp
+public static (int width, int height) GetCommonDimensions(
+    string aspectRatio, 
+    string quality = "high")
+```
+
+**Parameters:**
+- `aspectRatio` (string): Aspect ratio (e.g., "16:9", "4:3", "1:1")
+- `quality` (string): Quality level: "low", "medium", "high", "ultra"
+
+**Returns:** Tuple of (width, height)
+
+**Example:**
+```csharp
+// Get HD dimensions for 16:9
+var (width, height) = SoraClient.GetCommonDimensions("16:9", "high");
+// Returns: (1920, 1080)
+
+// Get low quality square video dimensions
+var (width, height) = SoraClient.GetCommonDimensions("1:1", "low");
+// Returns: (480, 480)
+```
+
+**Common Dimensions Table:**
+
+| Aspect Ratio | Low | Medium | High | Ultra |
+|--------------|-----|---------|------|--------|
+| 16:9 | 640×360 | 1280×720 | 1920×1080 | 2048×1152 |
+| 4:3 | 640×480 | 1024×768 | 1600×1200 | 2048×1536 |
+| 1:1 | 480×480 | 720×720 | 1080×1080 | 2048×2048 |
+| 9:16 | 360×640 | 720×1280 | 1080×1920 | 1152×2048 |
+| 3:4 | 480×640 | 768×1024 | 1200×1600 | 1536×2048 |
+| 21:9 | 840×360 | 1680×720 | 2048×880 | 2048×880 |
 
 ## Next Steps
 

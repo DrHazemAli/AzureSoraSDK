@@ -29,7 +29,7 @@ dotnet add package AzureSoraSDK
 Add the following to your `.csproj` file:
 
 ```xml
-<PackageReference Include="AzureSoraSDK" Version="1.0.0" />
+<PackageReference Include="AzureSoraSDK" Version="1.0.2" />
 ```
 
 ### 4. Package Manager UI

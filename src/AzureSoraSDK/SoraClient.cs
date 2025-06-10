@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -83,7 +84,7 @@ namespace AzureSoraSDK
         /// <summary>
         /// Legacy constructor for backward compatibility
         /// </summary>
-        public SoraClient(string endpoint, string apiKey, string deploymentName, string apiVersion = "2024-10-21")
+        public SoraClient(string endpoint, string apiKey, string deploymentName, string apiVersion = "preview")
             : this(new HttpClient(), new SoraClientOptions 
             { 
                 Endpoint = endpoint, 
@@ -97,12 +98,28 @@ namespace AzureSoraSDK
         /// <inheritdoc/>
         public async Task<string> SubmitVideoJobAsync(
             string prompt,
+            string aspectRatio,
+            string quality,
+            int nSeconds,
+            CancellationToken cancellationToken = default)
+        {
+            // Calculate dimensions from aspect ratio and quality
+            var (width, height) = GetCommonDimensions(aspectRatio, quality);
+            
+            _logger.LogInformation(
+                "Calculated dimensions for aspect ratio {AspectRatio} at {Quality} quality: {Width}x{Height}",
+                aspectRatio, quality, width, height);
+            
+            // Call the base implementation
+            return await SubmitVideoJobAsync(prompt, width, height, nSeconds, cancellationToken);
+        }
+
+        /// <inheritdoc/>
+        public async Task<string> SubmitVideoJobAsync(
+            string prompt,
             int width,
             int height,
-            int durationInSeconds,
-            string? aspectRatio = null,
-            int? frameRate = null,
-            int? seed = null,
+            int nSeconds,
             CancellationToken cancellationToken = default)
         {
             // Create and validate request
@@ -111,10 +128,7 @@ namespace AzureSoraSDK
                 Prompt = prompt,
                 Width = width,
                 Height = height,
-                DurationInSeconds = durationInSeconds,
-                AspectRatio = aspectRatio,
-                FrameRate = frameRate,
-                Seed = seed
+                NSeconds = nSeconds
             };
 
             try
@@ -133,17 +147,14 @@ namespace AzureSoraSDK
                 prompt = request.Prompt,
                 width = request.Width,
                 height = request.Height,
-                durationInSeconds = request.DurationInSeconds,
-                aspectRatio = request.AspectRatio,
-                frameRate = request.FrameRate,
-                seed = request.Seed
+                n_seconds = request.NSeconds
             };
 
             var url = $"/openai/v1/video/generations/jobs?api-version={_options.ApiVersion}";
             
             _logger.LogInformation(
                 "Submitting video job: {Width}x{Height}, {Duration}s, prompt length: {PromptLength}",
-                width, height, durationInSeconds, prompt.Length);
+                width, height, nSeconds, prompt.Length);
 
             using var content = new StringContent(
                 JsonSerializer.Serialize(jobRequest, _jsonOptions),
@@ -159,13 +170,13 @@ namespace AzureSoraSDK
             var responseData = await DeserializeResponseAsync<VideoJobCreationResponse>(
                 response, cancellationToken);
 
-            if (string.IsNullOrEmpty(responseData?.JobId))
+            if (string.IsNullOrEmpty(responseData?.Id))
             {
                 throw new SoraException("Invalid response: missing job ID");
             }
 
-            _logger.LogInformation("Video job submitted successfully: {JobId}", responseData.JobId);
-            return responseData.JobId;
+            _logger.LogInformation("Video job submitted successfully: {JobId}", responseData.Id);
+            return responseData.Id;
         }
 
         /// <inheritdoc/>
@@ -197,18 +208,37 @@ namespace AzureSoraSDK
                 throw new SoraException("Invalid status response");
             }
 
+            // Construct video URL if job succeeded and has generations
+            string? videoUrl = null;
+            if (statusResponse.Status?.ToLowerInvariant() == "succeeded" && 
+                statusResponse.Generations?.Any() == true)
+            {
+                var generationId = statusResponse.Generations.First().Id;
+                videoUrl = $"{_options.Endpoint}/openai/v1/video/generations/{generationId}/content/video?api-version={_options.ApiVersion}";
+            }
+
             var details = new JobDetails
             {
                 JobId = jobId,
                 Status = ParseJobStatus(statusResponse.Status),
-                VideoUrl = statusResponse.VideoUrl,
-                ErrorMessage = statusResponse.Error?.Message,
-                ErrorCode = statusResponse.Error?.Code,
-                CreatedAt = statusResponse.CreatedAt,
-                UpdatedAt = statusResponse.UpdatedAt,
-                CompletedAt = statusResponse.CompletedAt,
-                ProgressPercentage = statusResponse.ProgressPercentage,
-                Metadata = statusResponse.Metadata
+                VideoUrl = videoUrl,
+                ErrorMessage = statusResponse.FailureReason,
+                ErrorCode = null,
+                CreatedAt = statusResponse.CreatedAt.HasValue ? DateTimeOffset.FromUnixTimeSeconds(statusResponse.CreatedAt.Value) : null,
+                UpdatedAt = statusResponse.FinishedAt.HasValue ? DateTimeOffset.FromUnixTimeSeconds(statusResponse.FinishedAt.Value) : null,
+                CompletedAt = statusResponse.FinishedAt.HasValue ? DateTimeOffset.FromUnixTimeSeconds(statusResponse.FinishedAt.Value) : null,
+                ProgressPercentage = null, // Azure API doesn't provide progress percentage
+                Metadata = new Dictionary<string, object>
+                {
+                    ["model"] = statusResponse.Model ?? string.Empty,
+                    ["prompt"] = statusResponse.Prompt ?? string.Empty,
+                    ["n_variants"] = statusResponse.NVariants ?? 0,
+                    ["n_seconds"] = statusResponse.NSeconds ?? 0,
+                    ["width"] = statusResponse.Width ?? 0,
+                    ["height"] = statusResponse.Height ?? 0,
+                    ["expires_at"] = statusResponse.ExpiresAt.HasValue ? DateTimeOffset.FromUnixTimeSeconds(statusResponse.ExpiresAt.Value).ToString() : null!,
+                    ["generations"] = statusResponse.Generations?.Select(g => g.Id).ToList() ?? new List<string>()
+                }
             };
 
             _logger.LogDebug("Job {JobId} status: {Status}", jobId, details.Status);
@@ -430,7 +460,10 @@ namespace AzureSoraSDK
         {
             return status?.ToLowerInvariant() switch
             {
+                "queued" => JobStatus.Pending,
+                "preprocessing" => JobStatus.Running,
                 "running" => JobStatus.Running,
+                "processing" => JobStatus.Running,
                 "succeeded" => JobStatus.Succeeded,
                 "failed" => JobStatus.Failed,
                 "cancelled" => JobStatus.Cancelled,
@@ -486,44 +519,77 @@ namespace AzureSoraSDK
         // Response DTOs
         private class VideoJobCreationResponse
         {
-            [JsonPropertyName("jobId")]
-            public string JobId { get; set; } = string.Empty;
+            [JsonPropertyName("id")]
+            public string Id { get; set; } = string.Empty;
+            
+            [JsonPropertyName("object")]
+            public string Object { get; set; } = string.Empty;
+            
+            [JsonPropertyName("status")]
+            public string Status { get; set; } = string.Empty;
+            
+            [JsonPropertyName("created_at")]
+            public long? CreatedAt { get; set; }
+            
+            [JsonPropertyName("model")]
+            public string? Model { get; set; }
+            
+            [JsonPropertyName("prompt")]
+            public string? Prompt { get; set; }
         }
 
         private class VideoJobStatusResponse
         {
+            [JsonPropertyName("id")]
+            public string Id { get; set; } = string.Empty;
+            
+            [JsonPropertyName("object")]
+            public string Object { get; set; } = string.Empty;
+            
             [JsonPropertyName("status")]
             public string Status { get; set; } = string.Empty;
 
-            [JsonPropertyName("videoUrl")]
-            public string? VideoUrl { get; set; }
+            [JsonPropertyName("created_at")]
+            public long? CreatedAt { get; set; }
+            
+            [JsonPropertyName("finished_at")]
+            public long? FinishedAt { get; set; }
+            
+            [JsonPropertyName("expires_at")]
+            public long? ExpiresAt { get; set; }
 
-            [JsonPropertyName("error")]
-            public VideoError? Error { get; set; }
-
-            [JsonPropertyName("createdAt")]
-            public DateTimeOffset? CreatedAt { get; set; }
-
-            [JsonPropertyName("updatedAt")]
-            public DateTimeOffset? UpdatedAt { get; set; }
-
-            [JsonPropertyName("completedAt")]
-            public DateTimeOffset? CompletedAt { get; set; }
-
-            [JsonPropertyName("progressPercentage")]
-            public int? ProgressPercentage { get; set; }
-
-            [JsonPropertyName("metadata")]
-            public Dictionary<string, object>? Metadata { get; set; }
+            [JsonPropertyName("generations")]
+            public List<VideoGeneration>? Generations { get; set; }
+            
+            [JsonPropertyName("failure_reason")]
+            public string? FailureReason { get; set; }
+            
+            [JsonPropertyName("model")]
+            public string? Model { get; set; }
+            
+            [JsonPropertyName("prompt")]
+            public string? Prompt { get; set; }
+            
+            [JsonPropertyName("n_variants")]
+            public int? NVariants { get; set; }
+            
+            [JsonPropertyName("n_seconds")]
+            public int? NSeconds { get; set; }
+            
+            [JsonPropertyName("width")]
+            public int? Width { get; set; }
+            
+            [JsonPropertyName("height")]
+            public int? Height { get; set; }
         }
-
-        private class VideoError
+        
+        private class VideoGeneration
         {
-            [JsonPropertyName("message")]
-            public string Message { get; set; } = string.Empty;
-
-            [JsonPropertyName("code")]
-            public string? Code { get; set; }
+            [JsonPropertyName("id")]
+            public string Id { get; set; } = string.Empty;
+            
+            [JsonPropertyName("url")]
+            public string? Url { get; set; }
         }
 
         private class ErrorResponse
@@ -539,6 +605,119 @@ namespace AzureSoraSDK
 
             [JsonPropertyName("code")]
             public string? Code { get; set; }
+        }
+
+        /// <summary>
+        /// Calculates video dimensions from an aspect ratio string
+        /// </summary>
+        /// <param name="aspectRatio">Aspect ratio in format "width:height" (e.g., "16:9", "4:3")</param>
+        /// <param name="targetSize">Target size for the larger dimension</param>
+        /// <param name="preferWidth">If true, targetSize applies to width; if false, applies to height</param>
+        /// <returns>Tuple of (width, height) rounded to nearest 8 pixels</returns>
+        public static (int width, int height) CalculateDimensionsFromAspectRatio(
+            string aspectRatio, 
+            int targetSize = 1920, 
+            bool preferWidth = true)
+        {
+            if (string.IsNullOrWhiteSpace(aspectRatio))
+                throw new ArgumentException("Aspect ratio cannot be empty", nameof(aspectRatio));
+
+            var parts = aspectRatio.Split(':');
+            if (parts.Length != 2)
+                throw new ArgumentException($"Invalid aspect ratio format: {aspectRatio}. Expected format: 'width:height'", nameof(aspectRatio));
+
+            if (!double.TryParse(parts[0], out var widthRatio) || widthRatio <= 0)
+                throw new ArgumentException($"Invalid width ratio: {parts[0]}", nameof(aspectRatio));
+
+            if (!double.TryParse(parts[1], out var heightRatio) || heightRatio <= 0)
+                throw new ArgumentException($"Invalid height ratio: {parts[1]}", nameof(aspectRatio));
+
+            int width, height;
+            
+            if (preferWidth)
+            {
+                // Set width to target size and calculate height
+                width = targetSize;
+                height = (int)Math.Round(targetSize * heightRatio / widthRatio);
+            }
+            else
+            {
+                // Set height to target size and calculate width
+                height = targetSize;
+                width = (int)Math.Round(targetSize * widthRatio / heightRatio);
+            }
+
+            // Round to nearest 8 pixels (Azure requirement)
+            width = (int)Math.Round(width / 8.0) * 8;
+            height = (int)Math.Round(height / 8.0) * 8;
+
+            // Ensure dimensions are within valid range (128-2048)
+            width = Math.Max(128, Math.Min(2048, width));
+            height = Math.Max(128, Math.Min(2048, height));
+
+            return (width, height);
+        }
+
+        /// <summary>
+        /// Gets common video dimensions for a given aspect ratio
+        /// </summary>
+        /// <param name="aspectRatio">Aspect ratio (e.g., "16:9", "4:3", "1:1")</param>
+        /// <param name="quality">Quality level: "low", "medium", "high", "ultra"</param>
+        /// <returns>Tuple of (width, height)</returns>
+        public static (int width, int height) GetCommonDimensions(string aspectRatio, string quality = "high")
+        {
+            var normalizedRatio = aspectRatio.Replace(" ", "").ToLowerInvariant();
+            var normalizedQuality = quality.ToLowerInvariant();
+
+            return (normalizedRatio, normalizedQuality) switch
+            {
+                // 16:9 (Widescreen)
+                ("16:9", "low") => (640, 360),
+                ("16:9", "medium") => (1280, 720),
+                ("16:9", "high") => (1920, 1080),
+                ("16:9", "ultra") => (2048, 1152),
+                
+                // 4:3 (Standard)
+                ("4:3", "low") => (640, 480),
+                ("4:3", "medium") => (1024, 768),
+                ("4:3", "high") => (1600, 1200),
+                ("4:3", "ultra") => (2048, 1536),
+                
+                // 1:1 (Square)
+                ("1:1", "low") => (480, 480),
+                ("1:1", "medium") => (720, 720),
+                ("1:1", "high") => (1080, 1080),
+                ("1:1", "ultra") => (2048, 2048),
+                
+                // 9:16 (Vertical/Portrait)
+                ("9:16", "low") => (360, 640),
+                ("9:16", "medium") => (720, 1280),
+                ("9:16", "high") => (1080, 1920),
+                ("9:16", "ultra") => (1152, 2048),
+                
+                // 3:4 (Portrait)
+                ("3:4", "low") => (480, 640),
+                ("3:4", "medium") => (768, 1024),
+                ("3:4", "high") => (1200, 1600),
+                ("3:4", "ultra") => (1536, 2048),
+                
+                // 21:9 (Ultrawide)
+                ("21:9", "low") => (840, 360),
+                ("21:9", "medium") => (1680, 720),
+                ("21:9", "high") => (2048, 880),
+                ("21:9", "ultra") => (2048, 880),
+                
+                // Default: calculate from aspect ratio
+                _ => CalculateDimensionsFromAspectRatio(aspectRatio, 
+                    normalizedQuality switch 
+                    { 
+                        "low" => 640, 
+                        "medium" => 1280, 
+                        "high" => 1920, 
+                        "ultra" => 2048, 
+                        _ => 1920 
+                    })
+            };
         }
     }
 } 

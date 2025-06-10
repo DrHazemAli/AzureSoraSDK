@@ -221,6 +221,38 @@ if (!Regex.IsMatch(jobId, @"^[a-zA-Z0-9\-]+$"))
 }
 ```
 
+### Understanding Job Status
+
+#### Job Status Values (v1.0.2+)
+
+The SDK now supports all Azure job status values:
+
+| Status | JobStatus Enum | Description |
+|--------|----------------|-------------|
+| `queued` | `Pending` | Job is waiting to start |
+| `preprocessing` | `Running` | Job is preparing |
+| `running` | `Running` | Job is actively processing |
+| `processing` | `Running` | Job is in final processing |
+| `succeeded` | `Succeeded` | Job completed successfully |
+| `failed` | `Failed` | Job failed |
+| `cancelled` | `Cancelled` | Job was cancelled |
+
+#### Video URL Construction
+
+When a job succeeds, the video URL is constructed from the generation ID:
+
+```csharp
+var status = await client.GetJobStatusAsync(jobId);
+if (status.Status == JobStatus.Succeeded)
+{
+    // Video URL is automatically constructed
+    Console.WriteLine($"Video URL: {status.VideoUrl}");
+    
+    // The URL format is:
+    // {endpoint}/openai/v1/video/generations/{generationId}/content/video?api-version={version}
+}
+```
+
 ## Debugging Tips
 
 ### Enable Detailed Logging
@@ -287,89 +319,9 @@ catch (SoraException ex)
    ```csharp
    // Lower resolution for faster generation
    var jobId = await client.SubmitVideoJobAsync(
-       prompt: prompt,
-       width: 1280,  // Instead of 1920
-       height: 720,  // Instead of 1080
-       durationInSeconds: 5  // Shorter duration
+       prompt: "Simple test prompt",
+       width: 640,
+       height: 480,
+       nSeconds: 5  // Shorter duration
    );
    ```
-
-2. **Parallel Processing**
-   ```csharp
-   var tasks = prompts.Select(prompt => 
-       client.SubmitVideoJobAsync(prompt, 1280, 720, 5)
-   ).ToList();
-   
-   var jobIds = await Task.WhenAll(tasks);
-   ```
-
-### Memory Issues
-
-**Solution:**
-```csharp
-// Stream large files instead of loading into memory
-await using var fileStream = new FileStream(
-    filePath, 
-    FileMode.Create, 
-    FileAccess.Write,
-    FileShare.None,
-    bufferSize: 81920, // 80KB buffer
-    useAsync: true);
-
-await response.Content.CopyToAsync(fileStream);
-```
-
-## Environment-Specific Issues
-
-### Docker Container
-
-```dockerfile
-# Ensure certificates are installed
-FROM mcr.microsoft.com/dotnet/aspnet:6.0
-RUN apt-get update && apt-get install -y ca-certificates
-
-# Set environment variables
-ENV AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com"
-ENV AZURE_OPENAI_KEY="your-key"
-```
-
-### Azure App Service
-
-```json
-// Application Settings
-{
-  "AZURE_OPENAI_ENDPOINT": "https://your-resource.openai.azure.com",
-  "AZURE_OPENAI_KEY": "@Microsoft.KeyVault(VaultName=myvault;SecretName=openai-key)"
-}
-```
-
-## Getting Help
-
-If you're still experiencing issues:
-
-1. **Check the GitHub Issues**
-   - Search [existing issues](https://github.com/DrHazemAli/AzureSoraSDK/issues)
-   - Include error messages in your search
-
-2. **Create a New Issue**
-   Include:
-   - SDK version
-   - .NET version
-   - Complete error message
-   - Code sample (without secrets)
-   - Steps to reproduce
-
-3. **Enable Debug Logging**
-   ```csharp
-   var logger = LoggerFactory
-       .Create(builder => builder.AddConsole())
-       .CreateLogger<SoraClient>();
-   
-   var client = new SoraClient(httpClient, options, logger);
-   ```
-
-## Next Steps
-
-- [Error Handling](Error-Handling) - Learn about exception types
-- [Configuration](Configuration) - Adjust settings for your needs
-- [Examples](Examples) - See working code examples 

@@ -163,10 +163,10 @@ public class VideoService
         }
         
         var jobId = await _client.SubmitVideoJobAsync(
-            prompt, 
-            width: 1920, 
-            height: 1080, 
-            durationInSeconds: 10);
+            "A sunset scene",
+            1280,
+            720,
+            nSeconds: 10);
             
         return jobId;
     }
@@ -228,7 +228,7 @@ public async Task<string> SubmitVideoJobAsync(
     string prompt, 
     int width, 
     int height, 
-    int durationInSeconds)
+    int nSeconds)
 {
     // Implementation
 }

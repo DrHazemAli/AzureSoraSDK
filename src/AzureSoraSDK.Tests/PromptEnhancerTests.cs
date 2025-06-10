@@ -21,7 +21,7 @@ namespace AzureSoraSDK.Tests
     {
         private readonly MockHttpMessageHandler _mockHttp;
         private readonly HttpClient _httpClient;
-        private readonly SoraClientOptions _options;
+        private readonly PromptEnhancerOptions _options;
         private readonly Mock<ILogger<PromptEnhancer>> _mockLogger;
         private readonly PromptEnhancer _sut;
         private readonly JsonSerializerOptions _jsonOptions;
@@ -32,12 +32,12 @@ namespace AzureSoraSDK.Tests
             _httpClient = new HttpClient(_mockHttp) { BaseAddress = new Uri("https://test.openai.azure.com") };
             _httpClient.DefaultRequestHeaders.Add("api-key", "test-api-key");
             
-            _options = new SoraClientOptions
+            _options = new PromptEnhancerOptions
             {
                 Endpoint = "https://test.openai.azure.com",
                 ApiKey = "test-api-key",
                 DeploymentName = "test-deployment",
-                ApiVersion = "2024-10-21"
+                ApiVersion = "2024-02-15-preview"
             };
             
             _mockLogger = new Mock<ILogger<PromptEnhancer>>();
@@ -63,8 +63,44 @@ namespace AzureSoraSDK.Tests
         public void Constructor_WithNullOptions_ThrowsArgumentNullException()
         {
             // Act & Assert
-            var act = () => new PromptEnhancer(_httpClient, (SoraClientOptions)null!);
+            var act = () => new PromptEnhancer(_httpClient, (PromptEnhancerOptions)null!);
             act.Should().Throw<ArgumentNullException>().WithParameterName("options");
+        }
+
+        [Fact]
+        public void Constructor_WithInvalidOptions_ThrowsArgumentException()
+        {
+            // Arrange
+            var invalidOptions = new PromptEnhancerOptions
+            {
+                Endpoint = "",
+                ApiKey = "test-key",
+                DeploymentName = "test-deployment"
+            };
+
+            // Act & Assert
+            var act = () => new PromptEnhancer(_httpClient, invalidOptions);
+            act.Should().Throw<ArgumentException>();
+        }
+
+        [Fact]
+        public void Constructor_WithValidOptions_ConfiguresCorrectly()
+        {
+            // Arrange
+            var customOptions = new PromptEnhancerOptions
+            {
+                Endpoint = "https://custom.openai.azure.com",
+                ApiKey = "custom-key",
+                DeploymentName = "custom-deployment",
+                ApiVersion = "2024-03-01-preview",
+                DefaultTemperature = 0.5,
+                DefaultTopP = 0.8,
+                MaxTokensPerRequest = 2000
+            };
+
+            // Act & Assert
+            var act = () => new PromptEnhancer(_httpClient, customOptions);
+            act.Should().NotThrow();
         }
 
         [Fact]
@@ -132,6 +168,45 @@ namespace AzureSoraSDK.Tests
             result.Should().HaveCount(3);
             result[0].Should().Contain("sunset");
             result.All(s => s.Length > 10).Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task SuggestPromptsAsync_UsesConfiguredTemperatureAndTopP()
+        {
+            // Arrange
+            var customOptions = new PromptEnhancerOptions
+            {
+                Endpoint = "https://test.openai.azure.com",
+                ApiKey = "test-api-key",
+                DeploymentName = "test-deployment",
+                ApiVersion = "2024-02-15-preview",
+                DefaultTemperature = 0.5,
+                DefaultTopP = 0.8
+            };
+
+            var customEnhancer = new PromptEnhancer(_httpClient, customOptions);
+            string capturedRequestBody = "";
+
+            _mockHttp.When(HttpMethod.Post, "*/chat/completions*")
+                .With(request => 
+                {
+                    capturedRequestBody = request.Content!.ReadAsStringAsync().Result;
+                    return true;
+                })
+                .Respond("application/json", JsonSerializer.Serialize(new
+                {
+                    choices = new[]
+                    {
+                        new { message = new { content = "Enhanced prompt" } }
+                    }
+                }, _jsonOptions));
+
+            // Act
+            await customEnhancer.SuggestPromptsAsync("test");
+
+            // Assert
+            capturedRequestBody.Should().Contain("\"temperature\":0.5");
+            capturedRequestBody.Should().Contain("\"topP\":0.8");
         }
 
         [Fact]
@@ -320,6 +395,51 @@ A spring forest with blooming wildflowers
             // Act & Assert
             var act = () => new PromptEnhancer(httpClient, "test-deployment");
             act.Should().Throw<ArgumentException>();
+        }
+
+        [Fact]
+        public void LegacyConstructor_WithSoraClientOptions_CreatesEnhancer()
+        {
+            // Arrange
+            var soraOptions = new SoraClientOptions
+            {
+                Endpoint = "https://test.openai.azure.com",
+                ApiKey = "test-api-key",
+                DeploymentName = "test-deployment",
+                ApiVersion = "2024-10-21"
+            };
+
+            // Act & Assert
+            var act = () => new PromptEnhancer(_httpClient, soraOptions);
+            act.Should().NotThrow();
+        }
+
+        [Fact]
+        public void PromptEnhancerOptions_Validation_ThrowsOnInvalidValues()
+        {
+            // Arrange
+            var options = new PromptEnhancerOptions();
+
+            // Act & Assert
+            var act = () => options.Validate();
+            act.Should().Throw<ArgumentException>();
+        }
+
+        [Fact]
+        public void PromptEnhancerOptions_Validation_SucceedsWithValidValues()
+        {
+            // Arrange
+            var options = new PromptEnhancerOptions
+            {
+                Endpoint = "https://test.openai.azure.com",
+                ApiKey = "test-key",
+                DeploymentName = "test-deployment",
+                ApiVersion = "2024-02-15-preview"
+            };
+
+            // Act & Assert
+            var act = () => options.Validate();
+            act.Should().NotThrow();
         }
     }
 } 

@@ -24,7 +24,7 @@ namespace AzureSoraSDK
     public class PromptEnhancer : IPromptEnhancer
     {
         private readonly HttpClient _httpClient;
-        private readonly SoraClientOptions _options;
+        private readonly PromptEnhancerOptions _options;
         private readonly ILogger<PromptEnhancer> _logger;
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly IAsyncPolicy<HttpResponseMessage> _retryPolicy;
@@ -33,9 +33,9 @@ namespace AzureSoraSDK
         /// Creates a new instance of PromptEnhancer
         /// </summary>
         /// <param name="httpClient">HttpClient instance (should be managed by IHttpClientFactory)</param>
-        /// <param name="options">Client configuration options</param>
+        /// <param name="options">Prompt enhancer configuration options</param>
         /// <param name="logger">Logger instance</param>
-        public PromptEnhancer(HttpClient httpClient, SoraClientOptions options, ILogger<PromptEnhancer>? logger = null)
+        public PromptEnhancer(HttpClient httpClient, PromptEnhancerOptions options, ILogger<PromptEnhancer>? logger = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -76,14 +76,33 @@ namespace AzureSoraSDK
         /// <summary>
         /// Legacy constructor for backward compatibility
         /// </summary>
-        public PromptEnhancer(HttpClient httpClient, string deploymentName, string apiVersion = "2024-10-21")
-            : this(httpClient, new SoraClientOptions 
+        [Obsolete("Use constructor with PromptEnhancerOptions instead")]
+        public PromptEnhancer(HttpClient httpClient, string deploymentName, string apiVersion = "2024-02-15-preview")
+            : this(httpClient, new PromptEnhancerOptions 
             { 
                 Endpoint = httpClient.BaseAddress?.ToString() ?? throw new ArgumentException("HttpClient must have BaseAddress set"),
                 ApiKey = httpClient.DefaultRequestHeaders.GetValues("api-key").FirstOrDefault() ?? string.Empty,
                 DeploymentName = deploymentName,
                 ApiVersion = apiVersion
             })
+        {
+        }
+
+        /// <summary>
+        /// Legacy constructor for backward compatibility with SoraClientOptions
+        /// </summary>
+        [Obsolete("Use constructor with PromptEnhancerOptions instead")]
+        public PromptEnhancer(HttpClient httpClient, SoraClientOptions soraOptions, ILogger<PromptEnhancer>? logger = null)
+            : this(httpClient, new PromptEnhancerOptions 
+            { 
+                Endpoint = soraOptions.Endpoint,
+                ApiKey = soraOptions.ApiKey,
+                DeploymentName = soraOptions.DeploymentName,
+                ApiVersion = "2024-02-15-preview", // Use prompt enhancement specific API version
+                HttpTimeout = soraOptions.HttpTimeout,
+                MaxRetryAttempts = soraOptions.MaxRetryAttempts,
+                RetryDelay = soraOptions.RetryDelay
+            }, logger)
         {
         }
 
@@ -133,9 +152,9 @@ Enhanced prompts:";
                     new Message { Role = "system", Content = systemPrompt },
                     new Message { Role = "user", Content = userPrompt }
                 },
-                MaxTokens = Math.Min(150 * maxSuggestions, 1000),
-                Temperature = 0.7,
-                TopP = 0.9,
+                MaxTokens = Math.Min(150 * maxSuggestions, _options.MaxTokensPerRequest),
+                Temperature = _options.DefaultTemperature,
+                TopP = _options.DefaultTopP,
                 N = 1,
                 Stop = new[] { "\n\n" }
             };

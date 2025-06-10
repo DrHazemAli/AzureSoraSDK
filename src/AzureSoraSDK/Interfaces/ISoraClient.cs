@@ -16,20 +16,30 @@ namespace AzureSoraSDK.Interfaces
         /// <param name="prompt">The text prompt describing the video to generate</param>
         /// <param name="width">Video width in pixels</param>
         /// <param name="height">Video height in pixels</param>
-        /// <param name="durationInSeconds">Video duration in seconds</param>
-        /// <param name="aspectRatio">Optional aspect ratio (e.g., "16:9")</param>
-        /// <param name="frameRate">Optional frame rate</param>
-        /// <param name="seed">Optional seed for reproducible generation</param>
+        /// <param name="nSeconds">Video duration in seconds</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>The job ID of the submitted video generation job</returns>
         Task<string> SubmitVideoJobAsync(
             string prompt,
             int width,
             int height,
-            int durationInSeconds,
-            string? aspectRatio = null,
-            int? frameRate = null,
-            int? seed = null,
+            int nSeconds,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Submits a video generation job using aspect ratio and quality settings
+        /// </summary>
+        /// <param name="prompt">The text prompt describing the video to generate</param>
+        /// <param name="aspectRatio">Aspect ratio (e.g., "16:9", "4:3", "1:1")</param>
+        /// <param name="quality">Quality level: "low", "medium", "high", "ultra"</param>
+        /// <param name="nSeconds">Video duration in seconds</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        /// <returns>The job ID of the submitted video generation job</returns>
+        Task<string> SubmitVideoJobAsync(
+            string prompt,
+            string aspectRatio,
+            string quality,
+            int nSeconds,
             CancellationToken cancellationToken = default);
 
         /// <summary>

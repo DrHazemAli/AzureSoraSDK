@@ -19,12 +19,7 @@ namespace AzureSoraSDK.Tests
             request.Prompt.Should().BeEmpty();
             request.Width.Should().Be(0);
             request.Height.Should().Be(0);
-            request.DurationInSeconds.Should().Be(0);
-            request.AspectRatio.Should().BeNull();
-            request.FrameRate.Should().BeNull();
-            request.Seed.Should().BeNull();
-            request.Quality.Should().BeNull();
-            request.Style.Should().BeNull();
+            request.NSeconds.Should().Be(0);
             request.Metadata.Should().BeNull();
         }
 
@@ -37,9 +32,7 @@ namespace AzureSoraSDK.Tests
                 Prompt = "A beautiful sunset",
                 Width = 1280,
                 Height = 720,
-                DurationInSeconds = 10,
-                AspectRatio = "16:9",
-                FrameRate = 30
+                NSeconds = 10
             };
 
             // Act & Assert
@@ -56,7 +49,7 @@ namespace AzureSoraSDK.Tests
                 Prompt = "",
                 Width = 1280,
                 Height = 720,
-                DurationInSeconds = 10
+                NSeconds = 10
             };
 
             // Act & Assert
@@ -73,7 +66,7 @@ namespace AzureSoraSDK.Tests
                 Prompt = new string('a', 4001), // Over 4000 chars
                 Width = 1280,
                 Height = 720,
-                DurationInSeconds = 10
+                NSeconds = 10
             };
 
             // Act & Assert
@@ -92,7 +85,7 @@ namespace AzureSoraSDK.Tests
                 Prompt = "Test",
                 Width = width,
                 Height = 720,
-                DurationInSeconds = 10
+                NSeconds = 10
             };
 
             // Act & Assert
@@ -111,7 +104,7 @@ namespace AzureSoraSDK.Tests
                 Prompt = "Test",
                 Width = 1280,
                 Height = height,
-                DurationInSeconds = 10
+                NSeconds = 10
             };
 
             // Act & Assert
@@ -130,7 +123,7 @@ namespace AzureSoraSDK.Tests
                 Prompt = "Test",
                 Width = 1280,
                 Height = 720,
-                DurationInSeconds = duration
+                NSeconds = duration
             };
 
             // Act & Assert
@@ -149,7 +142,7 @@ namespace AzureSoraSDK.Tests
                 Prompt = "Test",
                 Width = width,
                 Height = height,
-                DurationInSeconds = 10
+                NSeconds = 10
             };
 
             // Act & Assert
@@ -169,7 +162,7 @@ namespace AzureSoraSDK.Tests
                 Prompt = "Test",
                 Width = width,
                 Height = height,
-                DurationInSeconds = 10
+                NSeconds = 10
             };
 
             // Act & Assert
@@ -178,133 +171,30 @@ namespace AzureSoraSDK.Tests
                 .WithMessage("*divisible by 8*");
         }
 
-        [Theory]
-        [InlineData("16:9")]
-        [InlineData("4:3")]
-        [InlineData("1:1")]
-        [InlineData("21:9")]
-        public void VideoGenerationRequest_Validate_WithValidAspectRatio_DoesNotThrow(string aspectRatio)
-        {
-            // Arrange
-            var request = new VideoGenerationRequest
-            {
-                Prompt = "Test",
-                Width = 1280,
-                Height = 720,
-                DurationInSeconds = 10,
-                AspectRatio = aspectRatio
-            };
-
-            // Act & Assert
-            var act = () => request.Validate();
-            act.Should().NotThrow();
-        }
-
-        [Theory]
-        [InlineData("16-9")] // Wrong separator
-        [InlineData("16:9:4")] // Too many parts
-        [InlineData("16")] // Missing part
-        [InlineData("a:b")] // Non-numeric
-        public void VideoGenerationRequest_Validate_WithInvalidAspectRatio_ThrowsValidationException(string aspectRatio)
-        {
-            // Arrange
-            var request = new VideoGenerationRequest
-            {
-                Prompt = "Test",
-                Width = 1280,
-                Height = 720,
-                DurationInSeconds = 10,
-                AspectRatio = aspectRatio
-            };
-
-            // Act & Assert
-            var act = () => request.Validate();
-            act.Should().Throw<ValidationException>();
-        }
-
-        [Theory]
-        [InlineData(11)] // Below minimum
-        [InlineData(61)] // Above maximum
-        public void VideoGenerationRequest_Validate_WithInvalidFrameRate_ThrowsValidationException(int frameRate)
-        {
-            // Arrange
-            var request = new VideoGenerationRequest
-            {
-                Prompt = "Test",
-                Width = 1280,
-                Height = 720,
-                DurationInSeconds = 10,
-                FrameRate = frameRate
-            };
-
-            // Act & Assert
-            var act = () => request.Validate();
-            act.Should().Throw<ValidationException>();
-        }
-
-        [Theory]
-        [InlineData("standard")]
-        [InlineData("high")]
-        [InlineData("ultra")]
-        [InlineData("Standard")] // Case insensitive
-        [InlineData("HIGH")]
-        [InlineData("Ultra")]
-        public void VideoGenerationRequest_Validate_WithValidQuality_DoesNotThrow(string quality)
-        {
-            // Arrange
-            var request = new VideoGenerationRequest
-            {
-                Prompt = "Test",
-                Width = 1280,
-                Height = 720,
-                DurationInSeconds = 10,
-                Quality = quality
-            };
-
-            // Act & Assert
-            var act = () => request.Validate();
-            act.Should().NotThrow();
-        }
-
-        [Theory]
-        [InlineData("low")]
-        [InlineData("medium")]
-        [InlineData("super")]
-        [InlineData("4k")]
-        public void VideoGenerationRequest_Validate_WithInvalidQuality_ThrowsValidationException(string quality)
-        {
-            // Arrange
-            var request = new VideoGenerationRequest
-            {
-                Prompt = "Test",
-                Width = 1280,
-                Height = 720,
-                DurationInSeconds = 10,
-                Quality = quality
-            };
-
-            // Act & Assert
-            var act = () => request.Validate();
-            act.Should().Throw<ValidationException>()
-                .WithMessage("*Quality must be one of:*");
-        }
-
         [Fact]
-        public void VideoGenerationRequest_Validate_WithNegativeSeed_ThrowsValidationException()
+        public void VideoGenerationRequest_WithMetadata_StoresCorrectly()
         {
             // Arrange
+            var metadata = new Dictionary<string, string>
+            {
+                ["key1"] = "value1",
+                ["key2"] = "value2"
+            };
+
             var request = new VideoGenerationRequest
             {
                 Prompt = "Test",
                 Width = 1280,
                 Height = 720,
-                DurationInSeconds = 10,
-                Seed = -1
+                NSeconds = 10,
+                Metadata = metadata
             };
 
             // Act & Assert
-            var act = () => request.Validate();
-            act.Should().Throw<ValidationException>();
+            request.Metadata.Should().NotBeNull();
+            request.Metadata.Should().HaveCount(2);
+            request.Metadata["key1"].Should().Be("value1");
+            request.Metadata["key2"].Should().Be("value2");
         }
 
         [Fact]

@@ -31,10 +31,10 @@ class Program
 
         // Submit a video generation job
         var jobId = await client.SubmitVideoJobAsync(
-            prompt: "A serene sunset over mountain peaks, cinematic quality",
-            width: 1920,
-            height: 1080,
-            durationInSeconds: 10
+            prompt: "A beautiful sunset over mountains",
+            width: 1280,
+            height: 720,
+            nSeconds: 10
         );
 
         Console.WriteLine($"Job submitted: {jobId}");
@@ -132,7 +132,7 @@ export AZURE_OPENAI_DEPLOYMENT="sora"
     "Endpoint": "https://your-resource.openai.azure.com",
     "ApiKey": "your-api-key",
     "DeploymentName": "sora",
-    "ApiVersion": "2024-10-21",
+    "ApiVersion": "preview",
     "HttpTimeout": "00:05:00"
   }
 }
@@ -147,10 +147,7 @@ var jobId = await client.SubmitVideoJobAsync(
     prompt: "Your creative prompt here",
     width: 1920,
     height: 1080,
-    durationInSeconds: 15,
-    aspectRatio: "16:9",
-    frameRate: 30,
-    seed: 42 // For reproducible results
+    nSeconds: 15
 );
 ```
 

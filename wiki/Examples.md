@@ -5,6 +5,7 @@ This page contains comprehensive examples of using the AzureSoraSDK.
 ## Table of Contents
 
 - [Basic Examples](#basic-examples)
+- [Configuration Examples](#configuration-examples)
 - [Advanced Examples](#advanced-examples)
 - [Integration Examples](#integration-examples)
 - [Error Handling Examples](#error-handling-examples)
@@ -25,10 +26,10 @@ var client = new SoraClient(
 
 // Generate a video
 var jobId = await client.SubmitVideoJobAsync(
-    prompt: "A peaceful forest with sunlight filtering through trees",
-    width: 1920,
-    height: 1080,
-    durationInSeconds: 10
+    prompt: "A peaceful sunrise over mountain peaks",
+    width: 1280,
+    height: 720,
+    nSeconds: 10
 );
 
 // Wait and download
@@ -39,15 +40,183 @@ await client.DownloadVideoAsync(videoUrl, "forest.mp4");
 ### Custom Video Parameters
 
 ```csharp
-var jobId = await client.SubmitVideoJobAsync(
-    prompt: "Time-lapse of clouds moving across a blue sky",
-    width: 3840,
-    height: 2160,
-    durationInSeconds: 30,
-    aspectRatio: "16:9",
-    frameRate: 60,
-    seed: 12345  // For reproducible results
+// Generate longer video with higher resolution
+var jobId = await soraClient.SubmitVideoJobAsync(
+    prompt: "Epic space battle with laser effects",
+    width: 1920,
+    height: 1080,
+    nSeconds: 30
 );
+```
+
+### Using Aspect Ratio and Quality
+
+```csharp
+// Generate HD widescreen video
+var jobId = await soraClient.SubmitVideoJobAsync(
+    prompt: "A cinematic sunset over mountains",
+    aspectRatio: "16:9",
+    quality: "high",
+    nSeconds: 15
+);
+
+// Generate vertical video for social media
+var jobId = await soraClient.SubmitVideoJobAsync(
+    prompt: "Product showcase with dynamic transitions",
+    aspectRatio: "9:16",
+    quality: "medium",
+    nSeconds: 30
+);
+
+// Generate square video for Instagram
+var jobId = await soraClient.SubmitVideoJobAsync(
+    prompt: "Artistic abstract animation",
+    aspectRatio: "1:1",
+    quality: "ultra",
+    nSeconds: 10
+);
+```
+
+### Calculating Custom Dimensions
+
+```csharp
+// Calculate dimensions for custom aspect ratio
+var (width, height) = SoraClient.CalculateDimensionsFromAspectRatio("2.35:1", 2048);
+Console.WriteLine($"Cinema dimensions: {width}x{height}");
+// Output: Cinema dimensions: 2048x872
+
+// Calculate dimensions with height preference
+var (w, h) = SoraClient.CalculateDimensionsFromAspectRatio("3:2", 1200, preferWidth: false);
+Console.WriteLine($"Portrait dimensions: {w}x{h}");
+// Output: Portrait dimensions: 1800x1200
+```
+
+### Dynamic Quality Selection
+
+```csharp
+public async Task<string> GenerateVideoWithDynamicQuality(
+    string prompt,
+    string aspectRatio,
+    bool prioritizeSpeed)
+{
+    // Choose quality based on priority
+    string quality = prioritizeSpeed ? "low" : "high";
+    
+    // Get dimensions for the selected quality
+    var (width, height) = SoraClient.GetCommonDimensions(aspectRatio, quality);
+    
+    _logger.LogInformation(
+        "Generating {AspectRatio} video at {Quality} quality: {Width}x{Height}",
+        aspectRatio, quality, width, height
+    );
+    
+    return await soraClient.SubmitVideoJobAsync(
+        prompt,
+        aspectRatio,
+        quality,
+        nSeconds: 10
+    );
+}
+```
+
+## Configuration Examples
+
+### Separate Configuration for Video Generation and Prompt Enhancement
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using AzureSoraSDK.Extensions;
+using AzureSoraSDK.Configuration;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Configure services with separate endpoints and settings
+builder.Services.AddAzureSoraSDK(
+    configureSoraOptions: options =>
+    {
+        options.Endpoint = "https://your-sora-endpoint.openai.azure.com";
+        options.ApiKey = "your-sora-api-key";
+        options.DeploymentName = "sora";
+        options.ApiVersion = "preview";
+        options.HttpTimeout = TimeSpan.FromMinutes(10);
+        options.MaxRetryAttempts = 5;
+        options.DefaultPollingInterval = TimeSpan.FromSeconds(3);
+    },
+    configurePromptEnhancerOptions: options =>
+    {
+        options.Endpoint = "https://your-chat-endpoint.openai.azure.com";
+        options.ApiKey = "your-chat-api-key";
+        options.DeploymentName = "gpt-4";
+        options.ApiVersion = "2024-02-15-preview";
+        options.HttpTimeout = TimeSpan.FromMinutes(3);
+        options.DefaultTemperature = 0.6;
+        options.DefaultTopP = 0.8;
+        options.MaxTokensPerRequest = 2000;
+    });
+
+var app = builder.Build();
+```
+
+### Direct Configuration with PromptEnhancerOptions
+
+```csharp
+using AzureSoraSDK.Configuration;
+
+// Configure prompt enhancer separately
+var promptEnhancerOptions = new PromptEnhancerOptions
+{
+    Endpoint = "https://your-chat-endpoint.openai.azure.com",
+    ApiKey = "your-chat-api-key",
+    DeploymentName = "gpt-4-turbo",
+    ApiVersion = "2024-02-15-preview",
+    DefaultTemperature = 0.5,
+    DefaultTopP = 0.9,
+    MaxTokensPerRequest = 1500,
+    HttpTimeout = TimeSpan.FromMinutes(2)
+};
+
+var promptEnhancer = new PromptEnhancer(httpClient, promptEnhancerOptions, logger);
+
+// Configure video generation separately
+var soraOptions = new SoraClientOptions
+{
+    Endpoint = "https://your-sora-endpoint.openai.azure.com",
+    ApiKey = "your-sora-api-key",
+    DeploymentName = "sora",
+    ApiVersion = "preview"
+};
+
+var soraClient = new SoraClient(httpClient, soraOptions, logger);
+```
+
+### Configuration from appsettings.json with Separate Sections
+
+```json
+{
+  "AzureSora": {
+    "Endpoint": "https://your-sora-endpoint.openai.azure.com",
+    "ApiKey": "your-sora-api-key",
+    "DeploymentName": "sora",
+    "ApiVersion": "preview",
+    "HttpTimeout": "00:05:00",
+    "MaxRetryAttempts": 3,
+    "DefaultPollingInterval": "00:00:03"
+  },
+  "PromptEnhancer": {
+    "Endpoint": "https://your-chat-endpoint.openai.azure.com",
+    "ApiKey": "your-chat-api-key",
+    "DeploymentName": "gpt-4",
+    "ApiVersion": "2024-02-15-preview",
+    "HttpTimeout": "00:02:00",
+    "DefaultTemperature": 0.7,
+    "MaxTokensPerRequest": 1500
+  }
+}
+```
+
+```csharp
+// Load configuration from appsettings.json
+builder.Services.AddAzureSoraSDK(builder.Configuration.GetSection("AzureSora"));
 ```
 
 ## Advanced Examples
@@ -127,54 +296,177 @@ private async Task<string> SubmitAndWaitAsync(ISoraClient client, string prompt)
 }
 ```
 
-### Using Prompt Enhancement
+### Enhanced Prompt Generation with Separate Configuration
 
 ```csharp
 public class VideoService
 {
     private readonly ISoraClient _soraClient;
     private readonly IPromptEnhancer _promptEnhancer;
+    private readonly ILogger<VideoService> _logger;
     
-    public VideoService(ISoraClient soraClient, IPromptEnhancer promptEnhancer)
+    public VideoService(ISoraClient soraClient, IPromptEnhancer promptEnhancer, ILogger<VideoService> logger)
     {
         _soraClient = soraClient;
         _promptEnhancer = promptEnhancer;
+        _logger = logger;
     }
     
     public async Task<string> GenerateEnhancedVideo(string userPrompt)
     {
-        // Get enhanced prompts
-        var suggestions = await _promptEnhancer.SuggestPromptsAsync(
-            userPrompt, 
-            maxSuggestions: 5
-        );
-        
-        // Let user choose or auto-select best one
-        Console.WriteLine("Enhanced prompt suggestions:");
-        for (int i = 0; i < suggestions.Count; i++)
+        try
         {
-            Console.WriteLine($"{i + 1}. {suggestions[i]}");
+            // Get enhanced prompts using separate configuration
+            var suggestions = await _promptEnhancer.SuggestPromptsAsync(
+                userPrompt, 
+                maxSuggestions: 5
+            );
+            
+            _logger.LogInformation("Generated {Count} prompt suggestions", suggestions.Length);
+            
+            // Let user choose or auto-select best one
+            Console.WriteLine("Enhanced prompt suggestions:");
+            for (int i = 0; i < suggestions.Length; i++)
+            {
+                Console.WriteLine($"{i + 1}. {suggestions[i]}");
+            }
+            
+            // Use the first suggestion or original prompt
+            var enhancedPrompt = suggestions.FirstOrDefault() ?? userPrompt;
+            _logger.LogInformation("Selected prompt: {Prompt}", enhancedPrompt);
+            
+            // Generate video with enhanced prompt using separate video endpoint
+            var jobId = await _soraClient.SubmitVideoJobAsync(
+                enhancedPrompt,
+                1920,
+                1080,
+                15
+            );
+            
+            var videoUrl = await _soraClient.WaitForCompletionAsync(jobId);
+            return videoUrl.ToString();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating enhanced video");
+            throw;
+        }
+    }
+    
+    public async Task<VideoGenerationResult> GenerateMultipleVariations(string basePrompt)
+    {
+        // Get multiple enhanced variations
+        var suggestions = await _promptEnhancer.SuggestPromptsAsync(basePrompt, 3);
+        var results = new List<VideoJobResult>();
+        
+        // Generate videos for each suggestion
+        foreach (var suggestion in suggestions)
+        {
+            try
+            {
+                var jobId = await _soraClient.SubmitVideoJobAsync(
+                    suggestion,
+                    1280,
+                    720,
+                    10
+                );
+                
+                results.Add(new VideoJobResult
+                {
+                    JobId = jobId,
+                    Prompt = suggestion,
+                    Status = "Submitted"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to submit job for prompt: {Prompt}", suggestion);
+                results.Add(new VideoJobResult
+                {
+                    Prompt = suggestion,
+                    Status = "Failed",
+                    Error = ex.Message
+                });
+            }
         }
         
-        // Use the first suggestion
-        var enhancedPrompt = suggestions.FirstOrDefault() ?? userPrompt;
+        return new VideoGenerationResult
+        {
+            BasePrompt = basePrompt,
+            Jobs = results
+        };
+    }
+}
+
+public class VideoGenerationResult
+{
+    public string BasePrompt { get; set; } = string.Empty;
+    public List<VideoJobResult> Jobs { get; set; } = new();
+}
+
+public class VideoJobResult
+{
+    public string? JobId { get; set; }
+    public string Prompt { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? VideoUrl { get; set; }
+    public string? Error { get; set; }
+}
+```
+
+### Dynamic Prompt Enhancement Settings
+
+```csharp
+public class AdaptivePromptEnhancer
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<AdaptivePromptEnhancer> _logger;
+    
+    public AdaptivePromptEnhancer(HttpClient httpClient, ILogger<AdaptivePromptEnhancer> logger)
+    {
+        _httpClient = httpClient;
+        _logger = logger;
+    }
+    
+    public async Task<string[]> GetCreativePrompts(string basePrompt)
+    {
+        var creativeOptions = new PromptEnhancerOptions
+        {
+            Endpoint = "https://your-chat-endpoint.openai.azure.com",
+            ApiKey = "your-chat-api-key",
+            DeploymentName = "gpt-4",
+            ApiVersion = "2024-02-15-preview",
+            DefaultTemperature = 0.9,  // High creativity
+            DefaultTopP = 0.95,
+            MaxTokensPerRequest = 1500
+        };
         
-        // Generate video with enhanced prompt
-        var jobId = await _soraClient.SubmitVideoJobAsync(
-            enhancedPrompt,
-            1920,
-            1080,
-            15
-        );
+        var enhancer = new PromptEnhancer(_httpClient, creativeOptions, _logger);
+        return await enhancer.SuggestPromptsAsync(basePrompt, 5);
+    }
+    
+    public async Task<string[]> GetPrecisePrompts(string basePrompt)
+    {
+        var preciseOptions = new PromptEnhancerOptions
+        {
+            Endpoint = "https://your-chat-endpoint.openai.azure.com",
+            ApiKey = "your-chat-api-key",
+            DeploymentName = "gpt-4",
+            ApiVersion = "2024-02-15-preview",
+            DefaultTemperature = 0.3,  // Low creativity, high precision
+            DefaultTopP = 0.7,
+            MaxTokensPerRequest = 1000
+        };
         
-        return await _soraClient.WaitForCompletionAsync(jobId);
+        var enhancer = new PromptEnhancer(_httpClient, preciseOptions, _logger);
+        return await enhancer.SuggestPromptsAsync(basePrompt, 3);
     }
 }
 ```
 
 ## Integration Examples
 
-### ASP.NET Core Web API
+### ASP.NET Core Web API with Separate Configuration
 
 ```csharp
 [ApiController]
@@ -182,14 +474,41 @@ public class VideoService
 public class VideoGenerationController : ControllerBase
 {
     private readonly ISoraClient _soraClient;
+    private readonly IPromptEnhancer _promptEnhancer;
     private readonly ILogger<VideoGenerationController> _logger;
     
     public VideoGenerationController(
         ISoraClient soraClient,
+        IPromptEnhancer promptEnhancer,
         ILogger<VideoGenerationController> logger)
     {
         _soraClient = soraClient;
+        _promptEnhancer = promptEnhancer;
         _logger = logger;
+    }
+    
+    [HttpPost("enhance-prompt")]
+    public async Task<IActionResult> EnhancePrompt([FromBody] PromptRequest request)
+    {
+        try
+        {
+            var suggestions = await _promptEnhancer.SuggestPromptsAsync(
+                request.Prompt,
+                request.MaxSuggestions ?? 3
+            );
+            
+            return Ok(new
+            {
+                original = request.Prompt,
+                suggestions = suggestions,
+                count = suggestions.Length
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to enhance prompt: {Prompt}", request.Prompt);
+            return BadRequest(new { error = "Failed to enhance prompt" });
+        }
     }
     
     [HttpPost("generate")]
@@ -201,14 +520,23 @@ public class VideoGenerationController : ControllerBase
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
             
-            // Submit job
+            string finalPrompt = request.Prompt;
+            
+            // Enhance prompt if requested
+            if (request.EnhancePrompt)
+            {
+                var suggestions = await _promptEnhancer.SuggestPromptsAsync(request.Prompt, 1);
+                finalPrompt = suggestions.FirstOrDefault() ?? request.Prompt;
+                _logger.LogInformation("Enhanced prompt from '{Original}' to '{Enhanced}'", 
+                    request.Prompt, finalPrompt);
+            }
+            
+            // Submit video job
             var jobId = await _soraClient.SubmitVideoJobAsync(
-                request.Prompt,
+                finalPrompt,
                 request.Width ?? 1920,
                 request.Height ?? 1080,
-                request.Duration ?? 10,
-                request.AspectRatio,
-                request.FrameRate
+                request.nSeconds ?? 10
             );
             
             _logger.LogInformation("Video job submitted: {JobId}", jobId);
@@ -216,6 +544,9 @@ public class VideoGenerationController : ControllerBase
             return Ok(new
             {
                 jobId,
+                originalPrompt = request.Prompt,
+                finalPrompt = finalPrompt,
+                enhanced = request.EnhancePrompt,
                 message = "Video generation started",
                 statusUrl = $"/api/video/{jobId}/status"
             });
@@ -228,54 +559,81 @@ public class VideoGenerationController : ControllerBase
         {
             return StatusCode(429, "Rate limit exceeded. Please try again later.");
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate video");
+            return StatusCode(500, "Internal server error");
+        }
     }
     
     [HttpGet("{jobId}/status")]
     public async Task<IActionResult> GetStatus(string jobId)
     {
-        var status = await _soraClient.GetJobStatusAsync(jobId);
-        
-        return Ok(new
+        try
         {
-            jobId = status.JobId,
-            status = status.Status.ToString(),
-            progress = status.ProgressPercentage,
-            videoUrl = status.VideoUrl,
-            error = status.ErrorMessage
-        });
+            var status = await _soraClient.GetJobStatusAsync(jobId);
+            
+            return Ok(new
+            {
+                jobId = status.JobId,
+                status = status.Status.ToString(),
+                progress = status.ProgressPercentage,
+                videoUrl = status.VideoUrl,
+                error = status.ErrorMessage,
+                createdAt = status.CreatedAt,
+                updatedAt = status.UpdatedAt
+            });
+        }
+        catch (SoraNotFoundException)
+        {
+            return NotFound(new { error = $"Job {jobId} not found" });
+        }
     }
     
     [HttpGet("{jobId}/download")]
     public async Task<IActionResult> DownloadVideo(string jobId)
     {
-        var status = await _soraClient.GetJobStatusAsync(jobId);
-        
-        if (status.Status != JobStatus.Succeeded || string.IsNullOrEmpty(status.VideoUrl))
+        try
         {
-            return BadRequest("Video not ready for download");
+            var status = await _soraClient.GetJobStatusAsync(jobId);
+            
+            if (status.Status != JobStatus.Succeeded || string.IsNullOrEmpty(status.VideoUrl))
+            {
+                return BadRequest("Video not ready for download");
+            }
+            
+            // Stream the video
+            var httpClient = new HttpClient();
+            var stream = await httpClient.GetStreamAsync(status.VideoUrl);
+            
+            return File(stream, "video/mp4", $"video_{jobId}.mp4");
         }
-        
-        // Stream the video
-        var httpClient = new HttpClient();
-        var stream = await httpClient.GetStreamAsync(status.VideoUrl);
-        
-        return File(stream, "video/mp4", $"video_{jobId}.mp4");
+        catch (SoraNotFoundException)
+        {
+            return NotFound(new { error = $"Job {jobId} not found" });
+        }
     }
+}
+
+public class PromptRequest
+{
+    [Required]
+    public string Prompt { get; set; } = string.Empty;
+    public int? MaxSuggestions { get; set; }
 }
 
 public class VideoRequest
 {
     [Required]
-    public string Prompt { get; set; }
+    public string Prompt { get; set; } = string.Empty;
+    public bool EnhancePrompt { get; set; } = true;
     public int? Width { get; set; }
     public int? Height { get; set; }
-    public int? Duration { get; set; }
-    public string? AspectRatio { get; set; }
-    public int? FrameRate { get; set; }
+    public int? nSeconds { get; set; }
 }
 ```
 
-### Background Job Processing
+### Background Job Processing with Separate Services
 
 ```csharp
 public class VideoGenerationBackgroundService : BackgroundService
@@ -318,26 +676,37 @@ public class VideoGenerationBackgroundService : BackgroundService
     {
         using var scope = _serviceProvider.CreateScope();
         var soraClient = scope.ServiceProvider.GetRequiredService<ISoraClient>();
+        var promptEnhancer = scope.ServiceProvider.GetRequiredService<IPromptEnhancer>();
         
-        // Submit job
-        var jobId = await soraClient.SubmitVideoJobAsync(
-            job.Prompt,
-            job.Width,
-            job.Height,
-            job.Duration,
-            cancellationToken: cancellationToken
-        );
-        
-        // Update job status in database
-        job.AzureJobId = jobId;
-        job.Status = "Processing";
-        // Save to database...
-        
-        // Wait for completion
         try
         {
+            // Enhance prompt if requested
+            string finalPrompt = job.Prompt;
+            if (job.EnhancePrompt)
+            {
+                var suggestions = await promptEnhancer.SuggestPromptsAsync(job.Prompt, 1);
+                finalPrompt = suggestions.FirstOrDefault() ?? job.Prompt;
+                _logger.LogInformation("Enhanced prompt for job {JobId}", job.Id);
+            }
+            
+            // Submit job to Azure
+            var azureJobId = await soraClient.SubmitVideoJobAsync(
+                finalPrompt,
+                job.Width,
+                job.Height,
+                job.nSeconds,
+                cancellationToken: cancellationToken
+            );
+            
+            // Update job status in database
+            job.AzureJobId = azureJobId;
+            job.FinalPrompt = finalPrompt;
+            job.Status = "Processing";
+            // Save to database...
+            
+            // Wait for completion
             var videoUrl = await soraClient.WaitForCompletionAsync(
-                jobId,
+                azureJobId,
                 cancellationToken: cancellationToken
             );
             
@@ -347,16 +716,36 @@ public class VideoGenerationBackgroundService : BackgroundService
             
             job.Status = "Completed";
             job.VideoPath = filePath;
+            job.VideoUrl = videoUrl.ToString();
+            
+            _logger.LogInformation("Video job completed: {JobId}", job.Id);
         }
         catch (SoraException ex)
         {
             job.Status = "Failed";
             job.Error = ex.Message;
+            _logger.LogError(ex, "Video job failed: {JobId}", job.Id);
         }
         
         // Update database...
-        _logger.LogInformation("Video job completed: {JobId}", job.Id);
     }
+}
+
+public class VideoJob
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Prompt { get; set; } = string.Empty;
+    public string? FinalPrompt { get; set; }
+    public bool EnhancePrompt { get; set; } = true;
+    public int Width { get; set; } = 1920;
+    public int Height { get; set; } = 1080;
+    public int nSeconds { get; set; } = 10;
+    public string Status { get; set; } = "Queued";
+    public string? AzureJobId { get; set; }
+    public string? VideoPath { get; set; }
+    public string? VideoUrl { get; set; }
+    public string? Error { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 ```
 
@@ -385,7 +774,7 @@ public class ResilientVideoService
                     request.Prompt,
                     request.Width,
                     request.Height,
-                    request.Duration
+                    request.nSeconds
                 );
                 
                 // Wait with timeout

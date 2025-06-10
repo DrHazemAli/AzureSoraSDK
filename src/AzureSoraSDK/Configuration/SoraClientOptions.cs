@@ -28,9 +28,9 @@ namespace AzureSoraSDK.Configuration
         public string DeploymentName { get; set; } = string.Empty;
 
         /// <summary>
-        /// API version to use (default: 2024-10-21)
+        /// API version to use (default: preview)
         /// </summary>
-        public string ApiVersion { get; set; } = "2024-10-21";
+        public string ApiVersion { get; set; } = "preview";
 
         /// <summary>
         /// Default timeout for HTTP requests
