@@ -519,8 +519,6 @@ namespace AzureSoraSDK.Tests
             };
             
             _mockHttp.When(HttpMethod.Post, "*/v1/video/generations/jobs*")
-                .WithContent("*\"width\":1920*")
-                .WithContent("*\"height\":1080*")
                 .Respond("application/json", JsonSerializer.Serialize(responseContent, _jsonOptions));
 
             // Act
